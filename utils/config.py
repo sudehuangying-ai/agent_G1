@@ -152,6 +152,7 @@ class AccountConfig:
 	cookies: dict | str | None
 	api_user: str | None = None
 	provider: str = 'anyrouter'
+	group: str | None = None
 	name: str | None = None
 	email: str | None = None
 	password: str | None = None
@@ -166,6 +167,7 @@ class AccountConfig:
 			cookies=data.get('cookies'),
 			api_user=data.get('api_user'),
 			provider=provider,
+			group=data.get('group'),
 			name=name if name else None,
 			email=data.get('email'),
 			password=data.get('password'),
@@ -178,6 +180,10 @@ class AccountConfig:
 	def get_display_name(self, index: int) -> str:
 		"""获取显示名称"""
 		return self.name if self.name else f'Account {index + 1}'
+
+	def get_group_label(self) -> str:
+		"""获取推送展示分组；未配置时回退到 provider。"""
+		return self.group if self.group else self.provider
 
 
 def load_accounts_config() -> list[AccountConfig] | None:
