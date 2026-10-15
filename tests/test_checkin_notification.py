@@ -4,7 +4,7 @@ from checkin import format_check_in_notification
 def test_format_check_in_notification_includes_group():
 	detail = {
 		'name': '测试账号',
-		'group': 'Team A',
+		'group': 'core',
 		'before_quota': 1.0,
 		'before_used': 0.2,
 		'after_quota': 1.5,
@@ -16,4 +16,4 @@ def test_format_check_in_notification_includes_group():
 
 	notification = format_check_in_notification(detail)
 
-	assert notification.startswith('[CHECK-IN] 测试账号（分组: Team A）')
+	assert notification.startswith('[CHECK-IN] 测试账号（分组: core）')

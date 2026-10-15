@@ -245,10 +245,12 @@ def get_user_info(client, headers, user_info_url: str):
 				user_data = data.get('data', {})
 				quota = round(user_data.get('quota', 0) / 500000, 2)
 				used_quota = round(user_data.get('used_quota', 0) / 500000, 2)
+				group = user_data.get('group')
 				return {
 					'success': True,
 					'quota': quota,
 					'used_quota': used_quota,
+					'group': group,
 					'display': f':money: Current balance: ${quota}, Used: ${used_quota}',
 				}
 		return {'success': False, 'error': f'Failed to get user info: HTTP {response.status_code}'}
@@ -551,7 +553,7 @@ async def main():
 
 					account_check_in_details[account_key] = {
 						'name': account.get_display_name(i),
-						'group': account.get_group_label(),
+						'group': user_info_after.get('group') or account.provider,
 						'before_quota': before_quota,
 						'before_used': before_used,
 						'after_quota': after_quota,
@@ -565,7 +567,10 @@ async def main():
 			if should_notify_this_account:
 				account_name = account.get_display_name(i)
 				status = '[SUCCESS]' if success else '[FAIL]'
-				account_result = f'{status} {account_name}（分组: {account.get_group_label()}）'
+				group_label = account.provider
+				if user_info_after:
+					group_label = user_info_after.get('group') or account.provider
+				account_result = f'{status} {account_name}（分组: {group_label}）'
 				if user_info_after and user_info_after.get('success'):
 					account_result += f'\n{user_info_after["display"]}'
 				elif user_info_after:
@@ -576,7 +581,7 @@ async def main():
 			account_name = account.get_display_name(i)
 			print(f'[FAILED] {account_name} processing exception: {e}')
 			need_notify = True
-			group_label = account.get_group_label()
+			group_label = account.provider
 			notification_content.append(f'[FAIL] {account_name}（分组: {group_label}）exception: {str(e)[:50]}...')
 
 	current_balance_hash = generate_balance_hash(current_balances) if current_balances else None

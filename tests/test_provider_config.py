@@ -1,6 +1,6 @@
 import json
 
-from utils.config import AccountConfig, AppConfig, ProviderConfig
+from utils.config import AppConfig, ProviderConfig
 
 
 def test_builtin_provider_profile_persistence_defaults(monkeypatch):
@@ -47,20 +47,3 @@ def test_provider_from_dict_inherits_profile_persistence_from_defaults():
 	)
 
 	assert provider.persist_profile is True
-
-
-def test_account_group_defaults_to_provider():
-	account = AccountConfig.from_dict({'api_user': '1'}, 0)
-
-	assert account.group is None
-	assert account.get_group_label() == 'anyrouter'
-
-
-def test_account_group_can_be_configured():
-	account = AccountConfig.from_dict(
-		{'api_user': '1', 'provider': 'agentrouter', 'group': 'Team A'},
-		0,
-	)
-
-	assert account.group == 'Team A'
-	assert account.get_group_label() == 'Team A'
