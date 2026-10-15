@@ -490,6 +490,9 @@ async def main():
 
 	app_config = AppConfig.load_from_env()
 	print(f'[INFO] Loaded {len(app_config.providers)} provider configuration(s)')
+	force_notify = os.getenv('CHECKIN_FORCE_NOTIFY', '').strip().lower() == 'true'
+	if force_notify:
+		print('[NOTIFY] Force notify enabled')
 	if is_debug_enabled():
 		for provider_name, provider in sorted(app_config.providers.items()):
 			print(f'[INFO] Provider "{provider_name}": use_proxy={provider.use_proxy}')
@@ -589,7 +592,10 @@ async def main():
 		else:
 			print('[INFO] No balance changes detected')
 
-	if balance_changed:
+	if force_notify:
+		need_notify = True
+
+	if balance_changed or force_notify:
 		for i, account in enumerate(accounts):
 			account_key = f'account_{i + 1}'
 			if account_key in account_check_in_details:

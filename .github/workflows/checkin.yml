@@ -9,6 +9,11 @@ on:
         required: false
         default: false
         type: boolean
+      force_notify:
+        description: 强制发送签到通知（即使余额无变化）
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   checkin:
@@ -18,6 +23,7 @@ jobs:
       PYTHONIOENCODING: utf-8
       PYTHONUNBUFFERED: 1
       DEBUG_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug == 'true' && 'true' || 'false' }}
+      CHECKIN_FORCE_NOTIFY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_notify == 'true' && 'true' || 'false' }}
     steps:
     - uses: actions/checkout@v6
 
@@ -91,6 +97,7 @@ jobs:
     - name: 执行签到
       env:
         DEBUG_MODE: ${{ env.DEBUG_MODE }}
+        CHECKIN_FORCE_NOTIFY: ${{ env.CHECKIN_FORCE_NOTIFY }}
         CHECKIN_HEADLESS: false
         CHECKIN_HUMANIZE: true
         CHECKIN_WAIT_TIMEOUT_MS: 120000
