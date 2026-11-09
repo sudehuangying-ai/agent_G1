@@ -44,7 +44,6 @@ jobs:
       GNUPGHOME: ${{ github.workspace }}/.cache/warp/gnupg
       UV_CACHE_DIR: ${{ github.workspace }}/.cache/uv
       CLOAKBROWSER_CACHE_DIR: ${{ github.workspace }}/.cache/cloakbrowser
-      CLOAKBROWSER_BINARY_PATH: ${{ github.workspace }}/.cache/cloakbrowser/chromium-146.0.7680.177.5/chrome
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/playwright
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg-cache
       XDG_CONFIG_HOME: ${{ github.workspace }}/.cache/xdg-config
@@ -135,6 +134,7 @@ jobs:
         CHECKIN_HEADLESS: false
         CHECKIN_HUMANIZE: true
         CHECKIN_WAIT_TIMEOUT_MS: 120000
+        CLOAKBROWSER_BINARY_PATH: ${{ github.workspace }}/.cache/cloakbrowser/chromium-146.0.7680.177.5/chrome
         ANYROUTER_ACCOUNTS: ${{ secrets.ANYROUTER_ACCOUNTS }}
         PROVIDERS: ${{ secrets.PROVIDERS }}
         DINGDING_WEBHOOK: ${{ secrets.DINGDING_WEBHOOK }}
