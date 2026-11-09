@@ -10,6 +10,8 @@ def get_proxy_server(*, use_proxy: bool = True) -> str | None:
 	if not use_proxy:
 		return None
 	server = os.getenv('CHECKIN_PROXY_URL', '').strip()
+	if not server and os.getenv('CHECKIN_PROXY_REQUIRED', '').lower() == 'true':
+		raise RuntimeError('CHECKIN_PROXY_REQUIRED=true but CHECKIN_PROXY_URL is missing; refusing direct access')
 	return server or None
 
 
