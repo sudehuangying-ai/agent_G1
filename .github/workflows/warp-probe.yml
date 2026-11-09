@@ -1,4 +1,4 @@
-name: WARP route diagnostic
+name: WARP real check-in diagnostic
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/warp-probe.yml
       - scripts/probe_warp.py
+      - scripts/probe_warp_checkin.py
   workflow_dispatch:
 
 permissions:
@@ -23,6 +24,11 @@ jobs:
       PYTHONDONTWRITEBYTECODE: '1'
       TMPDIR: ${{ github.workspace }}/.cache/warp-probe/tmp
       GNUPGHOME: ${{ github.workspace }}/.cache/warp-probe/gnupg
+      CLOAKBROWSER_CACHE_DIR: ${{ github.workspace }}/.cache/warp-probe/cloakbrowser
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/warp-probe/playwright
+      XDG_CACHE_HOME: ${{ github.workspace }}/.cache/warp-probe/xdg-cache
+      XDG_CONFIG_HOME: ${{ github.workspace }}/.cache/warp-probe/xdg-config
+      XDG_DATA_HOME: ${{ github.workspace }}/.cache/warp-probe/xdg-data
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -32,6 +38,21 @@ jobs:
         run: |
           mkdir -p "$TMPDIR" "$GNUPGHOME"
           chmod 700 "$GNUPGHOME"
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          version: '0.13.7'
+          enable-cache: false
+          cache-local-path: ${{ github.workspace }}/.cache/warp-probe/uv-cache
+
+      - name: Install the same locked browser dependencies as production
+        run: |
+          uv sync --frozen --no-dev
+          uv run --frozen --no-dev python -m cloakbrowser install
 
       - name: Observe the original GitHub route
         run: python3 -B scripts/probe_warp.py direct
@@ -45,7 +66,9 @@ jobs:
           printf 'deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ %s main\n' \
             "$(lsb_release -cs)" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list >/dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cloudflare-warp
+          sudo apt-get install -y --no-install-recommends cloudflare-warp xvfb xauth \
+            fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont \
+            fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf
           sudo systemctl start warp-svc
           for attempt in {1..15}; do
             if warp-cli --accept-tos status >/dev/null 2>&1; then break; fi
@@ -57,6 +80,21 @@ jobs:
 
       - name: Verify WARP egress and compare public responses
         run: python3 -B scripts/probe_warp.py warp
+
+      - name: Perform one real AgentRouter login and observe check-in
+        env:
+          ANYROUTER_ACCOUNTS: ${{ secrets.ANYROUTER_ACCOUNTS }}
+          CHECKIN_PROXY_URL: socks5://127.0.0.1:40000
+          CHECKIN_HEADLESS: 'false'
+          CHECKIN_HUMANIZE: 'true'
+          CHECKIN_WAIT_TIMEOUT_MS: '120000'
+          DEBUG_MODE: 'false'
+          CLOAKBROWSER_BINARY_PATH: ${{ github.workspace }}/.cache/warp-probe/cloakbrowser/chromium-146.0.7680.177.5/chrome
+          CHECKIN_BROWSER_PROFILE_DIR: ${{ github.workspace }}/.cache/warp-probe/browser-profiles
+          CHECKIN_SCREENSHOT_DIR: ${{ github.workspace }}/.cache/warp-probe/screenshots
+        run: |
+          xvfb-run -a --server-args="-screen 0 1920x1080x24" \
+            uv run --frozen --no-dev python -B -m scripts.probe_warp_checkin
 
       - name: Remove the temporary WARP registration
         if: always()
@@ -75,6 +113,7 @@ jobs:
           path: |
             .cache/warp-probe/direct.json
             .cache/warp-probe/result.json
+            .cache/warp-probe/checkin-result.json
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 3
