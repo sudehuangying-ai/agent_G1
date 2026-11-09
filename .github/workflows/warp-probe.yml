@@ -1,0 +1,80 @@
+name: WARP route diagnostic
+
+on:
+  push:
+    branches: [diagnostics/warp-probe]
+    paths:
+      - .github/workflows/warp-probe.yml
+      - scripts/probe_warp.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare-routes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      TMPDIR: ${{ github.workspace }}/.cache/warp-probe/tmp
+      GNUPGHOME: ${{ github.workspace }}/.cache/warp-probe/gnupg
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+
+      - name: Prepare project output directories
+        run: |
+          mkdir -p "$TMPDIR" "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+
+      - name: Observe the original GitHub route
+        run: python3 -B scripts/probe_warp.py direct
+
+      - name: Install the official WARP client in this disposable runner
+        run: |
+          curl --proto '=https' --tlsv1.2 --retry 2 -fsSL \
+            https://pkg.cloudflareclient.com/pubkey.gpg -o "$TMPDIR/cloudflare-key.gpg"
+          gpg --batch --yes --dearmor --output "$TMPDIR/cloudflare-warp.gpg" "$TMPDIR/cloudflare-key.gpg"
+          sudo install -m 644 "$TMPDIR/cloudflare-warp.gpg" /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          printf 'deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ %s main\n' \
+            "$(lsb_release -cs)" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cloudflare-warp
+          sudo systemctl start warp-svc
+          for attempt in {1..15}; do
+            if warp-cli --accept-tos status >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          warp-cli --accept-tos registration new
+          warp-cli --accept-tos mode proxy
+          warp-cli --accept-tos connect
+
+      - name: Verify WARP egress and compare public responses
+        run: python3 -B scripts/probe_warp.py warp
+
+      - name: Remove the temporary WARP registration
+        if: always()
+        run: |
+          if command -v warp-cli >/dev/null 2>&1; then
+            warp-cli --accept-tos disconnect || true
+            warp-cli --accept-tos registration delete || true
+            sudo systemctl stop warp-svc || true
+          fi
+
+      - name: Upload only sanitized diagnostic results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: warp-route-diagnostic-${{ github.run_id }}
+          path: |
+            .cache/warp-probe/direct.json
+            .cache/warp-probe/result.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 3
